@@ -1,0 +1,8 @@
+##Ficheros excluidos
+
+**/*.o
+**/*.a
+**/*.bin
+**/*.elf
+bsp/obj
+**/*.*~
