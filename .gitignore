@@ -5,5 +5,7 @@
 **/*.bin
 !tools/flasher_redbee-econotag.bin
 **/*.elf
+**/*.bak
 bsp/obj
+.directory
 **/*.*~

@@ -12,7 +12,19 @@
  */
 typedef struct
 {
-	/* ESTA ESTRUCTURA SE DEFINIRÁ EN LA PRÁCTICA 6 */
+    volatile uint32_t intcntl;          //0x80020000
+    volatile uint32_t nimask;           //0x80020004
+    volatile uint32_t intennum;         //0x80020008
+    volatile uint32_t intdisnum;        //0x8002000C
+    volatile uint32_t intenable;        //0x80020010
+    volatile uint32_t inttype;          //0x80020014
+    const uint32_t reserved[4];         //0x80020018-0x80020024
+    volatile uint32_t const nivector;   //0x80020028;
+    volatile uint32_t const fivector;   //0x8002002C;
+    volatile uint32_t const intsrc;     //0x80020030;
+    volatile uint32_t intfrc;           //0x80020034;
+    volatile uint32_t const nipend;     //0x80020038;
+    volatile uint32_t const fipend;     //0x8002003C;
 } itc_regs_t;
 
 static volatile itc_regs_t* const itc_regs = ITC_BASE;
@@ -21,6 +33,12 @@ static volatile itc_regs_t* const itc_regs = ITC_BASE;
  * Tabla de manejadores de interrupción.
  */
 static itc_handler_t itc_handlers[itc_src_max];
+
+/**
+ * Estado de las interrupciones
+ */
+
+static uint32_t itc_ints_status;
 
 /*****************************************************************************/
 
@@ -32,7 +50,13 @@ static itc_handler_t itc_handlers[itc_src_max];
  */
 inline void itc_init ()
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        uint8_t i;
+        for(i = 0; i < itc_src_max; ++i)
+            itc_handlers[i] = (uint32_t) 0x0;
+        itc_regs->intfrc = (uint32_t) 0x0;
+        itc_regs->intenable = (uint32_t) 0x0;
+        //ponemos un 1 en las posiciones 19 y 20
+        itc_regs->intcntl &= (~( 3 << 19 ));
 }
 
 /*****************************************************************************/
@@ -43,7 +67,8 @@ inline void itc_init ()
  */
 inline void itc_disable_ints ()
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        itc_ints_status = itc_regs->intenable;
+        itc_regs->intenable = (uint32_t) 0;
 }
 
 /*****************************************************************************/
@@ -54,7 +79,7 @@ inline void itc_disable_ints ()
  */
 inline void itc_restore_ints ()
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        itc_regs->intenable = itc_ints_status;
 }
 
 /*****************************************************************************/
@@ -66,7 +91,7 @@ inline void itc_restore_ints ()
  */
 inline void itc_set_handler (itc_src_t src, itc_handler_t handler)
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+	itc_handlers[src] = handler;
 }
 
 /*****************************************************************************/
@@ -76,9 +101,14 @@ inline void itc_set_handler (itc_src_t src, itc_handler_t handler)
  * @param src		Identificador de la fuente
  * @param priority	Tipo de prioridad
  */
-inline void itc_set_priority (itc_src_t src, itc_priority_t priority)
+inline void itc_set_priority (itc_src_t src, itc_priority_t priority)	
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        if(priority)
+            /*Si hay alguna interrupcion mapeada como FIQ escribe el bit
+            encima y la pone como normal */
+            itc_regs->inttype = (uint32_t) (1 << src);
+        else
+            itc_regs->inttype &= (uint32_t) ~(1 << src);
 }
 
 /*****************************************************************************/
@@ -89,7 +119,7 @@ inline void itc_set_priority (itc_src_t src, itc_priority_t priority)
  */
 inline void itc_enable_interrupt (itc_src_t src)
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        itc_regs->intenable |= (uint32_t) (1 << src);
 }
 
 /*****************************************************************************/
@@ -100,7 +130,9 @@ inline void itc_enable_interrupt (itc_src_t src)
  */
 inline void itc_disable_interrupt (itc_src_t src)
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        uint32_t tmp = (1 << src);
+        itc_regs->intenable &= ~tmp;
+        
 }
 
 /*****************************************************************************/
@@ -111,7 +143,7 @@ inline void itc_disable_interrupt (itc_src_t src)
  */
 inline void itc_force_interrupt (itc_src_t src)
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        itc_regs->intfrc |= (1 << src);
 }
 
 /*****************************************************************************/
@@ -123,6 +155,7 @@ inline void itc_force_interrupt (itc_src_t src)
 inline void itc_unforce_interrupt (itc_src_t src)
 {
 	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        itc_regs->intfrc &= ~(1 << src);
 }
 
 /*****************************************************************************/
@@ -134,7 +167,14 @@ inline void itc_unforce_interrupt (itc_src_t src)
  */
 void itc_service_normal_interrupt ()
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        //obtener el numero de interrupción mas prioritaria
+        uint8_t pri = itc_regs->nivector;
+        //Deshabilitar las interrupciones menos prioritarias
+        itc_regs->nimask = pri;
+        //llamar al manejador de la interrupcion mas prioritaria
+        itc_handlers[pri]();
+        //al retornar, rehabilitar todas las interrupciones
+        itc_regs->nimask = 0x31;
 }
 
 /*****************************************************************************/
@@ -144,7 +184,8 @@ void itc_service_normal_interrupt ()
  */
 void itc_service_fast_interrupt ()
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+        //Obtener el indice del manejador de la fiq y llamar a la rutina
+        itc_handlers[itc_regs->fivector]();
 }
 
 /*****************************************************************************/

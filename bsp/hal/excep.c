@@ -199,9 +199,11 @@ inline excep_handler_t excep_get_handler (excep_t excep)
  * Para poder gestionar interrupciones anidadas y sacar partiro al controlador
  * de interrupciones es necesario escribir el manejador en ensamblador
  */
+__attribute__ ((interrupt("IRQ")))
 void excep_nonnested_irq_handler ()
 {
 	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 6 */
+	itc_service_normal_interrupt();
 }
 
 /*****************************************************************************/
