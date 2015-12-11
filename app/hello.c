@@ -6,6 +6,7 @@
 /*****************************************************************************/
 
 #include <stdint.h>
+#include "system.h"
 
 /*
  * Constantes relativas a la plataforma
@@ -23,6 +24,9 @@ volatile uint32_t * const reg_gpio_data_reset1 = (uint32_t *) 0x80000054;
 /* El led rojo está en el GPIO 44 (el bit 12 de los registros GPIO_X_1) */
 uint32_t const led_red_mask = (1 << (44-32));
 
+/* El led verde está en el GPIO 45 (el bit 13 de los registros GPIO_X_1) */
+uint32_t const led_green_mask = (1 << (45-32));
+
 /*
  * Constantes relativas a la aplicacion
  */
@@ -36,7 +40,7 @@ uint32_t const delay = 0x10000;
 void gpio_init(void)
 {
 	/* Configuramos el GPIO44 para que sea de salida */
-	*reg_gpio_pad_dir1 = led_red_mask;
+	*reg_gpio_pad_dir1 = led_red_mask | led_green_mask;
 }
 
 /*****************************************************************************/
@@ -81,25 +85,41 @@ void pause(void)
  */
 uint32_t the_led;
 
+/*****************************************************************************/
+
+/*
+ * Manejador de instrucciones no definidas
+ */
+__attribute__ ((interrupt("UNDEF")))
+void undef_handler(void){
+    *reg_gpio_data_set1 = led_green_mask;
+}
+
+/*****************************************************************************/
+
 /*
  * Programa principal
  */
 int main ()
 {
-	gpio_init();
+    gpio_init();
 
-        the_led = led_red_mask;
+    excep_set_handler(excep_undef, undef_handler);
+    
+    the_led = led_red_mask;
+    
+    asm(".word  0x26889912\n");
 
-	while (1)
-	{
-		leds_on(the_led);
-                pause();
+    while (1)
+    {
+        leds_on(the_led);
+        pause();
 
-		leds_off(the_led);
-                pause();
-	}
+        leds_off(the_led);
+        pause();
+    }
 
-        return 0;
+    return 0;
 }
 
 /*****************************************************************************/

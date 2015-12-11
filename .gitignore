@@ -3,6 +3,7 @@
 **/*.o
 **/*.a
 **/*.bin
+!tools/flasher_redbee-econotag.bin
 **/*.elf
 bsp/obj
 **/*.*~
