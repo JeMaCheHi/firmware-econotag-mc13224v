@@ -12,20 +12,23 @@
  * Constantes relativas a la plataforma
  */
 
-/* Dirección del registro de control de dirección del GPIO32-GPIO63 */
-volatile uint32_t * const reg_gpio_pad_dir1    = (uint32_t *) 0x80000004;
+// El led rojo está en el GPIO 44
+#define RED_LED gpio_pin_44
 
-/* Dirección del registro de activación de bits del GPIO32-GPIO63 */
-volatile uint32_t * const reg_gpio_data_set1   = (uint32_t *) 0x8000004c;
+// El led verde está en el GPIO 45
+#define GREEN_LED gpio_pin_45
 
-/* Dirección del registro de limpieza de bits del GPIO32-GPIO63 */
-volatile uint32_t * const reg_gpio_data_reset1 = (uint32_t *) 0x80000054;
+// Pin de salida del switch S3
+#define KBI0            gpio_pin_22
 
-/* El led rojo está en el GPIO 44 (el bit 12 de los registros GPIO_X_1) */
-uint32_t const led_red_mask = (1 << (44-32));
+// Pin de salida del switch S2
+#define KBI1            gpio_pin_23
 
-/* El led verde está en el GPIO 45 (el bit 13 de los registros GPIO_X_1) */
-uint32_t const led_green_mask = (1 << (45-32));
+// Pin de entrada del switch S3
+#define KBI4            gpio_pin_26
+
+// Pin de entrada del switch S2
+#define KBI5            gpio_pin_27
 
 /*
  * Constantes relativas a la aplicacion
@@ -39,32 +42,39 @@ uint32_t const delay = 0x10000;
  */
 void gpio_init(void)
 {
-	/* Configuramos el GPIO44 para que sea de salida */
-	*reg_gpio_pad_dir1 = led_red_mask | led_green_mask;
+	// Configuramos el GPIO44 y GPIO45 para que sea de salida
+	gpio_set_port_dir_output(gpio_port_1, 1 << RED_LED | 1 << GREEN_LED);
+        
+        //Configuramos los pines de los switches
+        gpio_set_port_dir_output(gpio_port_0, KBI0 | KBI1);
+        gpio_set_port_dir_input(gpio_port_0, KBI4 | KBI5);
+        
+        //Ponemos un 1 en KBI0 y KBI1 para leer la pulsacion de los switches
+        gpio_set_port(gpio_port_0, 1 << KBI0 | 1 << KBI1);
 }
 
 /*****************************************************************************/
 
 /*
- * Enciende los leds indicados en la máscara
- * @param mask Máscara para seleccionar leds
+ * Enciende el led indicado en el pin
+ * @param pin Pin para seleccionar leds
  */
-void leds_on (uint32_t mask)
+void led_on (uint32_t pin)
 {
-	/* Encendemos los leds indicados en la máscara */
-	*reg_gpio_data_set1 = mask;
+	// Encendemos los leds indicados por el pin
+	gpio_set_pin(pin);
 }
 
 /*****************************************************************************/
 
 /*
- * Apaga los leds indicados en la máscara
- * @param mask Máscara para seleccionar leds
+ * Apaga el led indicado en el pin
+ * @param pin Pin para seleccionar leds
  */
-void leds_off (uint32_t mask)
+void led_off (uint32_t pin)
 {
-	/* Apagamos los leds indicados en la máscara */
-	*reg_gpio_data_reset1 = mask;
+	// Apagamos los leds indicado por el pin
+	gpio_clear_pin(pin);
 }
 
 /*****************************************************************************/
@@ -78,12 +88,21 @@ void pause(void)
 	for (i=0 ; i<delay ; i++);
 }
 
-/*****************************************************************************/
-
-/*
- * Máscara del led que se hará parpadear
+/**
+ * Funcion para comprobar si se ha pulsado un switch
+ * @param led_green_mask
  */
-uint32_t the_led;
+
+void test_buttons(uint32_t * led){
+    uint32_t port_data;
+    gpio_get_port(gpio_port_0, &port_data);
+    if(port_data & (1 << KBI4)){
+        *led = GREEN_LED;
+    }
+    else if(port_data & (1 << KBI5)){
+        *led = RED_LED;
+    }    
+}
 
 /*****************************************************************************/
 
@@ -92,7 +111,7 @@ uint32_t the_led;
  */
 __attribute__ ((interrupt("UNDEF")))
 void undef_handler(void){
-    *reg_gpio_data_set1 = led_green_mask;
+    gpio_set_pin(GREEN_LED);
 }
 
 /*
@@ -100,7 +119,7 @@ void undef_handler(void){
  */
 
 void asm_handler(void){
-    *reg_gpio_data_set1 = led_green_mask;
+    gpio_set_pin(GREEN_LED);
     itc_unforce_interrupt(itc_src_asm);
 }
 
@@ -116,20 +135,27 @@ int main ()
     itc_set_handler(itc_src_asm, asm_handler);
     excep_set_handler(excep_undef, undef_handler);
     
-    itc_enable_interrupt(itc_src_asm);
-    itc_force_interrupt(itc_src_asm);
+//     itc_enable_interrupt(itc_src_asm);
+//     itc_force_interrupt(itc_src_asm);
     
-    the_led = led_red_mask;
-    
+    uint32_t led = RED_LED;
+    gpio_set_pin(led);
 
     while (1)
     {
-        leds_on(the_led);
+        test_buttons(&led);
+        gpio_set_pin(led);
         pause();
-
-        leds_off(the_led);
+        
+        gpio_clear_pin(led);
+        test_buttons(&led);
         pause();
-    }
+        
+	
+	
+	
+                
+    }   
 
     return 0;
 }

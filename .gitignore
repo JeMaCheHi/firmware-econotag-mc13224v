@@ -7,5 +7,5 @@
 **/*.elf
 **/*.bak
 bsp/obj
-.directory
+**/.directory
 **/*.*~
