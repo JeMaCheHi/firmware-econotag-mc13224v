@@ -66,7 +66,7 @@ LDFLAGS        = -nostartfiles
 #
 
 # Aplicación
-PROGNAME = hello
+PROGNAME = test_gpio
 OBJ      = $(PROGNAME).o
 ELF      = $(PROGNAME).elf
 BIN      = $(PROGNAME).bin

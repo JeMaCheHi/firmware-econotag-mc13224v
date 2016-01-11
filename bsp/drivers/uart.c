@@ -16,7 +16,81 @@
 
 typedef struct
 {
-	/* ESTA ESTRUCTURA SE DEFINIRÁ EN LA PRÁCTICA 8 */
+    //UART Control Register
+    union
+    {
+        //Acceso directo
+        uint32_t ucon;
+        //acceso a flags con bitfields
+        struct
+        {
+            uint32_t TxE        : 1;
+            uint32_t RxE        : 1;
+            uint32_t PEN        : 1;
+            uint32_t EP         : 1;
+            uint32_t ST2        : 1;
+            uint32_t SB         : 1;
+            uint32_t conTx      : 1;
+            uint32_t Tx_oen_b   : 1;
+            uint32_t            : 1;
+            uint32_t Res        : 1;
+            uint32_t xTIM       : 1;
+            uint32_t FCp        : 1;
+            uint32_t FCe        : 1;
+            uint32_t MTxR       : 1;
+            uint32_t MRxR       : 1;
+            uint32_t TST        : 1;
+        };
+    };            
+    //UART Status Register
+    union
+    {
+        uint32_t ustat;
+        struct
+        {
+            uint32_t SE         : 1;
+            uint32_t PE         : 1;
+            uint32_t FE         : 1;
+            uint32_t TOE        : 1;
+            uint32_t ROE        : 1;
+            uint32_t RUE        : 1;
+            uint32_t RxRdy      : 1;
+            uint32_t TxRdy      : 1;
+        };
+    };
+    //UART Data Register
+    union{
+        uint8_t Rx_data;
+        uint8_t Tx_data;
+        uint32_t udata;
+    };
+    //UART RxBuffer Control Register
+    union
+    {
+        uint32_t RxLevel            : 5;
+        uint32_t Rx_fifo_addr_diff  : 6;
+        uint32_t urxcon;
+    };
+    //UART TxBuffer Control Register
+    union
+    {
+        uint32_t TxLevel            : 5;
+        uint32_t Tx_fifo_addr_diff  : 6;
+        uint32_t utxcon;
+    };
+    //UART CTS Level Control Register
+    uint32_t ucts;
+    //UART Baud Rate Divider Register
+    union
+    {
+        uint32_t ubr;
+        struct
+        {
+            uint32_t ubrmod         : 16;
+            uint32_t ubrinc         : 16;
+        };
+    };
+
 } uart_regs_t;
 
 /*****************************************************************************/
@@ -83,9 +157,32 @@ static volatile uart_callbacks_t uart_callbacks[uart_max];
  */
 int32_t uart_init (uart_id_t uart, uint32_t br, const char *name)
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LAS PRÁCTICAS 8, 9 y 10 */
-
-	return 0;
+    //Comprobacion de errores
+    if(uart >= uart_max){
+        return -1;
+    }
+    //Desactivación de TxE, RxE, MTxR y MRxR
+    uart_regs[uart]->ucon = 0x6000;
+    
+    //Se establecen los baudios de la UART
+    uart_regs[uart]->ubrmod = 9999;
+    uart_regs[uart]->ubrinc = (br * 9999) / (CPU_FREQ >> 4);
+    
+    //Rehabilitamos la uart
+    uart_regs[uart]->TxE = 1;
+    uart_regs[uart]->RxE = 1;
+    //Fijamos la función de los pines
+    gpio_set_pin_func(uart_pins[uart].tx, gpio_func_alternate_1);
+    gpio_set_pin_func(uart_pins[uart].rx, gpio_func_alternate_1);
+    gpio_set_pin_func(uart_pins[uart].cts, gpio_func_alternate_1);
+    gpio_set_pin_func(uart_pins[uart].rts, gpio_func_alternate_1);
+    //Y fijamos entradas/salidas
+    gpio_set_pin_dir_output(uart_pins[uart].tx);
+    gpio_set_pin_dir_output(uart_pins[uart].cts);
+    gpio_set_pin_dir_input(uart_pins[uart].rx);
+    gpio_set_pin_dir_input(uart_pins[uart].rts);
+    
+    return 0;
 }
 
 /*****************************************************************************/
@@ -98,7 +195,9 @@ int32_t uart_init (uart_id_t uart, uint32_t br, const char *name)
  */
 void uart_send_byte (uart_id_t uart, uint8_t c)
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 8 */
+    //Bloquear mientras no haya espacio
+    while(uart_regs[uart]->Tx_fifo_addr_diff == 0);
+    uart_regs[uart]->Tx_data = c;
 }
 
 /*****************************************************************************/
@@ -111,8 +210,9 @@ void uart_send_byte (uart_id_t uart, uint8_t c)
  */
 uint8_t uart_receive_byte (uart_id_t uart)
 {
-	/* ESTA FUNCIÓN SE DEFINIRÁ EN LA PRÁCTICA 8 */
-        return 0;
+    //Bloquear mientras no haya nada que leer
+    while(uart_regs[uart]->Rx_fifo_addr_diff == 0);
+    return uart_regs[uart]->Rx_data;
 }
 
 /*****************************************************************************/

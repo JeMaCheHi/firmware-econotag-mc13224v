@@ -1,7 +1,7 @@
 /*****************************************************************************/
 /*                                                                           */
 /* Sistemas Empotrados                                                       */
-/* El "hola mundo" en la Redwire EconoTAG en C                               */
+/* Programa para testear el driver del GPIO                                  */
 /*                                                                           */
 /*****************************************************************************/
 
@@ -43,11 +43,11 @@ uint32_t const delay = 0x10000;
 void gpio_init(void)
 {
 	// Configuramos el GPIO44 y GPIO45 para que sea de salida
-	gpio_set_port_dir_output(gpio_port_1, 1 << RED_LED | 1 << GREEN_LED);
+	gpio_set_port_dir_output(gpio_port_1, 1 << (RED_LED - 32) | 1 << (GREEN_LED - 32));
         
         //Configuramos los pines de los switches
-        gpio_set_port_dir_output(gpio_port_0, KBI0 | KBI1);
-        gpio_set_port_dir_input(gpio_port_0, KBI4 | KBI5);
+        gpio_set_port_dir_output(gpio_port_0, 1 << KBI0 | 1 << KBI1);
+        gpio_set_port_dir_input(gpio_port_0, 1 << KBI4 | 1 << KBI5);
         
         //Ponemos un 1 en KBI0 y KBI1 para leer la pulsacion de los switches
         gpio_set_port(gpio_port_0, 1 << KBI0 | 1 << KBI1);
@@ -149,12 +149,7 @@ int main ()
         
         gpio_clear_pin(led);
         test_buttons(&led);
-        pause();
-        
-	
-	
-	
-                
+        pause();                
     }   
 
     return 0;
