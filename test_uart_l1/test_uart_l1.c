@@ -35,6 +35,10 @@
  */
 uint32_t const delay = 0x10000;
  
+//Estado de los leds en variables globales
+uint8_t blink_red_led = 1;
+uint8_t blink_green_led = 1;
+
 /*****************************************************************************/
 
 /*
@@ -56,46 +60,65 @@ void gpio_init(void)
 /*****************************************************************************/
 
 /*
+ * Retardo para el parpedeo
+ */
+void pause(void)
+{
+        uint32_t i;
+	for (i=0 ; i<delay ; i++);
+}
+
+/*****************************************************************************/
+
+/*
+ * Callback de recepción
+ */
+
+void my_rx_callback(void){
+    
+    //Mensaje de error
+    char c;
+    char msg[50] = "Error: solo se pueden usar las teclas [g] y [r]:\r\n";
+    uart_receive(uart_1, &c, 1);
+    if(c == 'g'){
+        blink_green_led= !blink_green_led;
+    }
+    else if( c == 'r'){
+        blink_red_led = !blink_red_led;
+    }
+    else{
+        uart_send(uart_1, msg, 50);
+    }
+}
+
+/*****************************************************************************/
+
+/*
  * Programa principal
  */
 int main ()
 {
     gpio_init();
     
-    //Estado de los leds
-    uint8_t led_rojo  = 0;
-    uint8_t led_verde = 0;
-    
-    gpio_clear_pin(GREEN_LED);
-    gpio_clear_pin(RED_LED);
-    
-    //Tecla recibida
-    
-    //Mensaje de error
-    char msg[50] = "Error: solo se pueden usar las teclas [g] y [r]\r\n";
+    uart_set_receive_callback(uart_1, (uart_callback_t) my_rx_callback);
 
     while (1)
     {
-    char c;
-        c = uart_receive_byte(uart_1);
-        if(c == 'g'){
-            if(led_verde = !led_verde)
-                gpio_set_pin(GREEN_LED);
-            else 
-                gpio_clear_pin(GREEN_LED);
+        //Hacer el parpadeo de los leds
+        if(blink_green_led){
+            gpio_set_pin(GREEN_LED);
         }
-        else if( c == 'r'){
-            if(led_rojo = !led_rojo)
-                gpio_set_pin(RED_LED);
-            else
-                gpio_clear_pin(RED_LED);
+        if(blink_red_led){
+            gpio_set_pin(RED_LED);
         }
-        else{
-            uint32_t i;
-            for(i = 0; i < 50; ++i){
-                uart_send_byte(uart_1, msg[i]);
-            }
-        }
+        pause();
+        
+        //Apagar los leds, si el parpadeo esta desactivado, se quedaran apagados.
+        gpio_clear_pin(GREEN_LED);
+        gpio_clear_pin(RED_LED);
+        
+        pause();
+    
     }   
 
     return 0;
